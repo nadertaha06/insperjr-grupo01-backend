@@ -12,10 +12,10 @@ from routes.dashboard import dashboard_routes
 
 app = Flask(__name__)
 
-# Em produção, troque "*" pela URL do seu frontend
-# Ex: FRONTEND_URL=https://meu-frontend.vercel.app
-FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
-CORS(app, origins=FRONTEND_URL)
+# CORS: FRONTEND_URL pode ser uma URL ou várias separadas por vírgula (sem espaços). Sem barra no final.
+_raw = (os.getenv("FRONTEND_URL") or "*").strip()
+_cors_origins = [o.strip() for o in _raw.split(",") if o.strip()] if "," in _raw else _raw
+CORS(app, origins=_cors_origins)
 
 # Prefixo RESTful versionado para o dashboard executivo
 API_PREFIX = "/api/v1"
@@ -47,4 +47,11 @@ def index():
     })
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.getenv("PORT", 5000))
+    debug = os.getenv("FLASK_ENV") != "production"
+    if debug and not os.getenv("PORT"):
+        app.run(debug=True, port=port)
+    else:
+        from waitress import serve
+        print(f"Servidor rodando em http://0.0.0.0:{port}")
+        serve(app, host="0.0.0.0", port=port)

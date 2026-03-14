@@ -85,6 +85,10 @@ insperjr-grupo01-backend/
 ├── app.py                 # Entrada: Flask, CORS, registro de rotas
 ├── db.py                  # Conexão MongoDB (ambev) e serialize_doc
 ├── requirements.txt
+├── Procfile               # Deploy: gunicorn (Heroku, Railway, Render)
+├── runtime.txt            # Python 3.11 (Heroku)
+├── Dockerfile             # Deploy em container (waitress)
+├── .dockerignore
 ├── .env                   # Variáveis de ambiente (não versionado)
 ├── .env.example
 ├── API.md                 # Documentação detalhada dos endpoints
@@ -181,10 +185,49 @@ Substitua `5000` por `8000` (ou outra porta) se o backend estiver configurado pa
 
 ## Deploy
 
-Em produção, defina no ambiente:
+### Variáveis de ambiente (obrigatórias em produção)
 
-- `MONGO_URI` — URI do cluster (ex.: Atlas)
-- `DB_NAME=ambev`
-- `FRONTEND_URL` — URL exata do frontend (ex.: `https://seu-dashboard.vercel.app`)
+| Variável       | Descrição |
+|----------------|-----------|
+| `MONGO_URI`    | URI do MongoDB (ex.: `mongodb+srv://user:pass@cluster.mongodb.net/`) |
+| `DB_NAME`      | `ambev` |
+| `FRONTEND_URL` | URL do frontend (sem barra no final). Várias origens: `https://app.com,https://www.app.com` |
 
-O `requirements.txt` inclui `waitress` e `gunicorn` para servir a aplicação em produção.
+A maioria das plataformas define `PORT` automaticamente. Opcional: `FLASK_ENV=production`.
+
+### Deploy com Procfile (Heroku, Railway, Render)
+
+O repositório já inclui um `Procfile`. A plataforma usa `gunicorn` e a variável `PORT`:
+
+```bash
+# Exemplo: após conectar o repositório, configure no painel:
+# MONGO_URI=...
+# DB_NAME=ambev
+# FRONTEND_URL=https://seu-front.vercel.app
+```
+
+Para **Heroku**, use `runtime.txt` (Python 3.11). O build instala as dependências e sobe com `web: gunicorn --bind 0.0.0.0:$PORT app:app`.
+
+### Deploy com Docker (Railway, Render, Fly.io, etc.)
+
+```bash
+docker build -t ambev-backend .
+docker run -p 5000:5000 -e MONGO_URI=... -e DB_NAME=ambev -e FRONTEND_URL=... ambev-backend
+```
+
+Na plataforma, aponte o serviço para este Dockerfile e configure as variáveis de ambiente. O container usa `python app.py` com **waitress** e lê `PORT` do ambiente (padrão 5000).
+
+### Rodar em produção local (waitress)
+
+Com `PORT` ou `FLASK_ENV=production` definidos, `python app.py` sobe com waitress em `0.0.0.0:PORT`:
+
+```bash
+# Windows
+set PORT=8000
+set FLASK_ENV=production
+python app.py
+
+# Linux/Mac
+export PORT=8000 FLASK_ENV=production
+python app.py
+```
