@@ -1,24 +1,39 @@
-from flask import Blueprint, jsonify, request
-from db import db
+from flask import Blueprint, request
+from db import db, serialize_doc
+from utils.rest import (
+    parse_pagination,
+    parse_sort,
+    parse_fields,
+    apply_list_options,
+    rest_list_response,
+    rest_item_response,
+)
 
 skus_routes = Blueprint("skus", __name__)
 
+# Campos permitidos para ordenação e projeção (dashboard pode pedir só o necessário)
+SKUS_SORT_KEYS = ["codigo", "nome", "container_type", "unidade_volume"]
+SKUS_PROJECTION_KEYS = ["_id", "codigo", "nome", "container_type", "unidade_volume"]
 
-@skus_routes.route("/skus")
+
+@skus_routes.route("/skus", methods=["GET"])
 def listar_skus():
     filtro = {}
+    if request.args.get("container_type"):
+        filtro["container_type"] = request.args.get("container_type")
+    if request.args.get("codigo"):
+        filtro["codigo"] = request.args.get("codigo")
 
-    container_type = request.args.get("container_type")
-    if container_type:
-        filtro["container_type"] = container_type
+    page, per_page = parse_pagination()
+    sort_list = parse_sort(SKUS_SORT_KEYS, default_sort="nome")
+    projection = parse_fields(SKUS_PROJECTION_KEYS)
 
-    skus = list(db["skus"].find(filtro, {"_id": 1, "codigo": 1, "nome": 1, "container_type": 1}))
-    return jsonify(skus)
+    cursor = db["skus"].find(filtro, projection)
+    docs, total = apply_list_options(cursor, db["skus"], filtro, sort_list=sort_list, page=page, per_page=per_page)
+    return rest_list_response(docs, total, page, per_page)
 
 
-@skus_routes.route("/skus/<sku_id>")
+@skus_routes.route("/skus/<sku_id>", methods=["GET"])
 def buscar_sku(sku_id):
     sku = db["skus"].find_one({"_id": sku_id})
-    if not sku:
-        return jsonify({"erro": "SKU não encontrado"}), 404
-    return jsonify(sku)
+    return rest_item_response(sku)
